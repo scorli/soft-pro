@@ -156,6 +156,10 @@
           </section>
 
           <section class="ap-pane" data-pane="notes">
+            <div class="ap-field" id="ap-links-field" style="display:none">
+              <label class="ap-field-label">Корисні посилання</label>
+              <div id="ap-links" class="ap-links"></div>
+            </div>
             <textarea id="ap-notes-textarea" class="ap-textarea ap-notes-area" placeholder="Нотатка для цього чату…"></textarea>
           </section>
         </div>

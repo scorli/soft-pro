@@ -393,6 +393,12 @@
       "Відкрити",
       () => { removeModal(); showCheckboxConfig(); }
     ));
+    body.appendChild(rowButton(
+      "Корисні посилання",
+      "Посилання у вкладці «Нотатки» (назва + URL)",
+      "Відкрити",
+      () => { removeModal(); showLinksConfig(); }
+    ));
     body.appendChild(allSettingsRow());
     body.appendChild(rowButton(
       "Очистити всі дані чатів",
@@ -418,12 +424,109 @@
 
     const footer = document.createElement("div");
     footer.className = "ap-modal-footer";
-    footer.textContent = "Alliance Pro v2.8 by @Nilfa";
+    footer.textContent = "Alliance Pro v2.9 by @Nilfa";
     wrap.appendChild(footer);
 
     const m = makeModal(wrap);
     x.addEventListener("click", m.close);
     AP.theme.apply(AP.theme.current());
+  }
+
+  let workingLinks = [];
+  const MAX_LINKS = 20;
+
+  function showLinksConfig() {
+    workingLinks = (AP.storage.getSettings().usefulLinks || []).map((l) => ({
+      name: (l && l.name) || "",
+      url: (l && l.url) || ""
+    }));
+
+    const wrap = document.createElement("div");
+    const { h, x } = header("Корисні посилання");
+    wrap.appendChild(h);
+
+    const body = document.createElement("div");
+    body.className = "ap-modal-body";
+
+    const hint = document.createElement("p");
+    hint.className = "ap-setting-sub";
+    hint.style.marginTop = "0";
+    hint.textContent = "Назва показується у вкладці «Нотатки» як кнопка, що відкриває посилання.";
+    body.appendChild(hint);
+
+    const list = document.createElement("div");
+    list.id = "ap-links-list";
+    body.appendChild(list);
+
+    const addBtn = document.createElement("button");
+    addBtn.className = "ap-btn ap-btn-ghost ap-links-add";
+    addBtn.textContent = "+ Додати посилання";
+    addBtn.addEventListener("click", () => {
+      if (workingLinks.length >= MAX_LINKS) return;
+      workingLinks.push({ name: "", url: "" });
+      renderLinksList();
+    });
+    body.appendChild(addBtn);
+    wrap.appendChild(body);
+
+    const actions = document.createElement("div");
+    actions.className = "ap-modal-actions ap-modal-actions-split";
+    const back = document.createElement("button");
+    back.className = "ap-btn ap-btn-ghost";
+    back.textContent = "Назад";
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "ap-btn ap-btn-primary";
+    saveBtn.textContent = "Зберегти";
+    actions.appendChild(back);
+    actions.appendChild(saveBtn);
+    wrap.appendChild(actions);
+
+    const m = makeModal(wrap);
+    x.addEventListener("click", () => { m.close(); showSettings(); });
+    back.addEventListener("click", () => { m.close(); showSettings(); });
+    saveBtn.addEventListener("click", () => {
+      const cleaned = workingLinks
+        .map((l) => ({ name: (l.name || "").trim(), url: (l.url || "").trim() }))
+        .filter((l) => l.url);
+      AP.storage.patchSettings({ usefulLinks: cleaned });
+      if (AP.notes) AP.notes.renderLinks();
+      m.close();
+      uiAlert({ title: "Збережено", text: "Корисні посилання збережено." });
+    });
+
+    renderLinksList();
+    AP.theme.apply(AP.theme.current());
+  }
+
+  function renderLinksList() {
+    const list = document.getElementById("ap-links-list");
+    if (!list) return;
+    list.innerHTML = "";
+    workingLinks.forEach((link, index) => {
+      const row = document.createElement("div");
+      row.className = "ap-links-row";
+      const name = document.createElement("input");
+      name.type = "text";
+      name.className = "ap-input ap-links-name";
+      name.maxLength = 40;
+      name.placeholder = "Назва";
+      name.value = link.name || "";
+      name.addEventListener("input", () => (workingLinks[index].name = name.value));
+      const url = document.createElement("input");
+      url.type = "text";
+      url.className = "ap-input ap-links-url";
+      url.placeholder = "https://…";
+      url.value = link.url || "";
+      url.addEventListener("input", () => (workingLinks[index].url = url.value));
+      const del = iconBtn("×", "Видалити", () => { workingLinks.splice(index, 1); renderLinksList(); });
+      del.classList.add("ap-cfg-del");
+      row.appendChild(name);
+      row.appendChild(url);
+      row.appendChild(del);
+      list.appendChild(row);
+    });
+    const addBtn = document.querySelector(".ap-links-add");
+    if (addBtn) addBtn.disabled = workingLinks.length >= MAX_LINKS;
   }
 
   let workingConfig = [];
@@ -795,7 +898,7 @@
 
   function exportConfig() {
     downloadJson(
-      { app: "Alliance Pro", type: "checkboxes", version: "2.8", timestamp: new Date().toISOString(), checkboxConfig: workingConfig },
+      { app: "Alliance Pro", type: "checkboxes", version: "2.9", timestamp: new Date().toISOString(), checkboxConfig: workingConfig },
       `alliance-pro-checkboxes-${stamp()}.json`
     );
   }

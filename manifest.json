@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Alliance Pro",
-  "version": "2.8",
+  "version": "2.9",
   "description": "Чек-лист (Зроблено/Залишилось/Комент), таймер зі звуком і нагадуванням, калькулятор і нотатки для chat.sender.ftband.net. Працює окремо від Sender Pro.",
   "icons": {
     "16": "icons/icon16.png",

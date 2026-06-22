@@ -25,6 +25,7 @@
       accent: null,
       uiScale: 1,
       timerSound: "classic",
+      usefulLinks: [],
       resetAfterCopy: false,
       windowPosition: null,
       hidden: false,
@@ -212,7 +213,7 @@
     return {
       app: "Alliance Pro",
       type: "settings-bundle",
-      version: "2.8",
+      version: "2.9",
       timestamp: new Date().toISOString(),
       settings: getSettings(),
       checkboxConfig: getCheckboxConfig(),

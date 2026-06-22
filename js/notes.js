@@ -10,7 +10,37 @@
     return AP.getEffectiveChatId ? AP.getEffectiveChatId() : "__nochat__";
   }
 
+  function normalizeUrl(u) {
+    u = (u || "").trim();
+    if (!u) return "";
+    return /^https?:\/\//i.test(u) ? u : "https://" + u;
+  }
+
+  function renderLinks() {
+    const box = document.getElementById("ap-links");
+    const field = document.getElementById("ap-links-field");
+    if (!box) return;
+    const links = (AP.storage.getSettings().usefulLinks || []).filter((l) => l && (l.url || "").trim());
+    box.innerHTML = "";
+    if (!links.length) {
+      if (field) field.style.display = "none";
+      return;
+    }
+    if (field) field.style.display = "flex";
+    links.forEach((l) => {
+      const a = document.createElement("a");
+      a.className = "ap-link-chip";
+      a.href = normalizeUrl(l.url);
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.textContent = (l.name || "").trim() || l.url;
+      a.title = normalizeUrl(l.url);
+      box.appendChild(a);
+    });
+  }
+
   function load() {
+    renderLinks();
     const textarea = document.getElementById("ap-notes-textarea");
     if (!textarea) return;
 
@@ -34,5 +64,5 @@
     textarea.addEventListener("input", handler);
   }
 
-  AP.notes = { load };
+  AP.notes = { load, renderLinks };
 })();

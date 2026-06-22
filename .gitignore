@@ -15,3 +15,6 @@ npm-debug.log*
 # Builds
 *.zip
 dist/
+
+# але архів версій лишаємо у репозиторії
+!archive/*.zip
