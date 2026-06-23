@@ -6,6 +6,33 @@
   let config = [];
   let dragId = null;
 
+  const MOODS = [
+    { key: "neg", name: "Негативний", emoji: "😠" },
+    { key: "neu", name: "Нейтральний", emoji: "😐" },
+    { key: "pos", name: "Позитивний", emoji: "😊" },
+    { key: "cyc", name: "Циклічний", emoji: "🔄" }
+  ];
+
+  function renderMood() {
+    const box = document.getElementById("ap-mood");
+    if (!box) return;
+    box.innerHTML = "";
+    MOODS.forEach((m) => {
+      const b = document.createElement("button");
+      b.className = "ap-mood-chip";
+      b.dataset.mood = m.key;
+      b.textContent = m.emoji + " " + m.name;
+      b.addEventListener("click", () => {
+        const on = b.classList.contains("ap-mood-on");
+        box.querySelectorAll(".ap-mood-chip").forEach((x) => x.classList.remove("ap-mood-on"));
+        if (!on) b.classList.add("ap-mood-on");
+        save();
+        updatePreview();
+      });
+      box.appendChild(b);
+    });
+  }
+
   function applyOptHighlight(opts) {
     if (!opts) return;
     opts.querySelectorAll(".ap-opt").forEach((o) => {
@@ -47,6 +74,7 @@
 
   function render() {
     renderProfileSelect();
+    renderMood();
     config = AP.storage.getCheckboxConfig();
     const root = document.getElementById("ap-checkboxes");
     if (!root) return;
@@ -177,6 +205,8 @@
     });
     const comment = document.getElementById("ap-comment");
     if (comment) { comment.value = data.comment || ""; comment.disabled = false; }
+    const moodBox = document.getElementById("ap-mood");
+    if (moodBox) moodBox.querySelectorAll(".ap-mood-chip").forEach((b) => b.classList.toggle("ap-mood-on", b.dataset.mood === data.mood));
     updatePreview();
   }
 
@@ -195,6 +225,8 @@
     });
     const comment = document.getElementById("ap-comment");
     data.comment = comment ? comment.value : "";
+    const moodEl = document.querySelector("#ap-mood .ap-mood-on");
+    data.mood = moodEl ? moodEl.dataset.mood : null;
     AP.storage.setChatData(id, data);
   }
 
@@ -221,8 +253,15 @@
     const commentVal = comment && comment.value.trim() ? comment.value.trim() : "";
     const doneStr = done.length ? done.join(", ") : "—";
     const remStr = remaining.length ? remaining.join(", ") : "—";
-    const parts = [`Зроблено: ${doneStr}`, `Залишилось: ${remStr}`];
-    if (commentVal) parts.push(`Комент: ${commentVal}`);
+
+    const moodEl = document.querySelector("#ap-mood .ap-mood-on");
+    const mood = moodEl ? MOODS.find((m) => m.key === moodEl.dataset.mood) : null;
+
+    const parts = [];
+    if (mood) parts.push(`${mood.emoji} Настрій: ${mood.name}`);
+    parts.push(`✅ Зроблено: ${doneStr}`);
+    parts.push(`📋 Залишилось: ${remStr}`);
+    if (commentVal) parts.push(`💬 Комент: ${commentVal}`);
     return parts.join("\n\n");
   }
 
@@ -274,6 +313,8 @@
     });
     const comment = document.getElementById("ap-comment");
     if (comment) comment.value = "";
+    const moodBox = document.getElementById("ap-mood");
+    if (moodBox) moodBox.querySelectorAll(".ap-mood-chip").forEach((b) => b.classList.remove("ap-mood-on"));
     save();
     updatePreview();
     if (!silent) flashStatus("Скинуто");

@@ -27,6 +27,8 @@
       timerSound: "classic",
       usefulLinks: [],
       resetAfterCopy: false,
+      autoClearDaily: false,
+      lastAutoClear: null,
       windowPosition: null,
       hidden: false,
       collapsed: false,
@@ -56,7 +58,7 @@
   }
 
   function blankChatData() {
-    return { cid: null, checks: {}, opts: {}, comment: "", notes: "" };
+    return { cid: null, checks: {}, opts: {}, comment: "", notes: "", mood: null };
   }
 
   function getChatData(chatId) {
@@ -213,7 +215,7 @@
     return {
       app: "Alliance Pro",
       type: "settings-bundle",
-      version: "2.9",
+      version: "3.2.3",
       timestamp: new Date().toISOString(),
       settings: getSettings(),
       checkboxConfig: getCheckboxConfig(),
@@ -245,8 +247,79 @@
     return true;
   }
 
+  // Список сайтів, де показувати міні-калькулятор. Зберігається у
+  // chrome.storage.local, бо має бути спільним між різними доменами
+  // (localStorage окремий під кожен сайт).
+  const ALLOWED_KEY = "alliancepro_allowedSites";
+
+  function hasChromeStorage() {
+    try { return !!(window.chrome && chrome.storage && chrome.storage.local); } catch (e) { return false; }
+  }
+
+  function getAllowedSites(cb) {
+    if (!hasChromeStorage()) { cb([]); return; }
+    try {
+      chrome.storage.local.get(ALLOWED_KEY, (r) => {
+        const list = (r && r[ALLOWED_KEY]) || [];
+        cb(Array.isArray(list) ? list : []);
+      });
+    } catch (e) { cb([]); }
+  }
+
+  function setAllowedSites(list, cb) {
+    if (!hasChromeStorage()) { if (cb) cb(); return; }
+    try {
+      const obj = {};
+      obj[ALLOWED_KEY] = Array.isArray(list) ? list : [];
+      chrome.storage.local.set(obj, () => { if (cb) cb(); });
+    } catch (e) { if (cb) cb(); }
+  }
+
+  // Глобальний таймер і будильник — спільні для всіх сайтів і вкладок
+  // (chrome.storage.local), щоб був ОДИН таймер, а не окремий під сторінку.
+  const SHARED_TIMER_KEY = "alliancepro_timer";
+  const SHARED_REMINDER_KEY = "alliancepro_reminder";
+
+  function getSharedTimer(cb) {
+    if (!hasChromeStorage()) { cb(null); return; }
+    try {
+      chrome.storage.local.get(SHARED_TIMER_KEY, (r) => cb((r && r[SHARED_TIMER_KEY]) || null));
+    } catch (e) { cb(null); }
+  }
+  function setSharedTimer(t, cb) {
+    if (!hasChromeStorage()) { if (cb) cb(); return; }
+    try {
+      const o = {}; o[SHARED_TIMER_KEY] = t;
+      chrome.storage.local.set(o, () => { if (cb) cb(); });
+    } catch (e) { if (cb) cb(); }
+  }
+  function getSharedReminder(cb) {
+    if (!hasChromeStorage()) { cb(null); return; }
+    try {
+      chrome.storage.local.get(SHARED_REMINDER_KEY, (r) => cb((r && r[SHARED_REMINDER_KEY]) || null));
+    } catch (e) { cb(null); }
+  }
+  function setSharedReminder(r, cb) {
+    if (!hasChromeStorage()) { if (cb) cb(); return; }
+    try {
+      const o = {}; o[SHARED_REMINDER_KEY] = r;
+      chrome.storage.local.set(o, () => { if (cb) cb(); });
+    } catch (e) { if (cb) cb(); }
+  }
+  function onSharedChange(key, cb) {
+    if (!hasChromeStorage()) return;
+    try {
+      if (!chrome.storage.onChanged) return;
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === "local" && changes[key]) cb(changes[key].newValue || null);
+      });
+    } catch (e) {}
+  }
+
   AP.storage = {
     getSettings,
+    getAllowedSites,
+    setAllowedSites,
     setSettings,
     patchSettings,
     getChatData,
@@ -266,6 +339,11 @@
     setTimerState,
     getReminder,
     setReminder,
+    getSharedTimer,
+    setSharedTimer,
+    getSharedReminder,
+    setSharedReminder,
+    onSharedChange,
     exportAll,
     importAll
   };

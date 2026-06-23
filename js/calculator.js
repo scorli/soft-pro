@@ -159,6 +159,18 @@
     render();
   }
 
+  function hasRuntime() {
+    try { return !!(window.chrome && chrome.runtime && chrome.runtime.sendMessage); } catch (e) { return false; }
+  }
+  function sendSW(m) {
+    if (!hasRuntime()) return;
+    try { chrome.runtime.sendMessage(m, () => { void chrome.runtime.lastError; }); } catch (e) {}
+  }
+
+  // Глобальний таймер: стан зберігається у chrome.storage (спільний для всіх
+  // вкладок і сайтів), час рахується від endTime (не «тікає» локально, тому
+  // не зупиняється, коли вкладка неактивна), а спрацювання у фоні забезпечує
+  // service worker через chrome.alarms.
   function initTimer() {
     const display = document.getElementById("ap-timer-display");
     const minInput = document.getElementById("ap-timer-min");
@@ -172,65 +184,60 @@
     if (!display || !startBtn || timerInited) return;
     timerInited = true;
 
-    let remaining = 0;
-    let intervalId = null;
-    let running = false;
+    let cache = {
+      status: "idle",
+      endTime: null,
+      remaining: 0,
+      min: parseInt(minInput.value, 10) || 0,
+      sec: parseInt(secInput.value, 10) || 0,
+      fired: 0
+    };
+    let displayId = null;
     let alarmIntervalId = null;
+    let lastFiredHandled = 0;
 
     const fmtTime = (t) => {
       const m = Math.floor(t / 60).toString().padStart(2, "0");
       const s = Math.floor(t % 60).toString().padStart(2, "0");
       return `${m}:${s}`;
     };
-    const render = () => (display.textContent = fmtTime(remaining));
-
     const inputSeconds = () => {
       const m = parseInt(minInput.value, 10) || 0;
       const s = parseInt(secInput.value, 10) || 0;
       return Math.max(0, m * 60 + s);
     };
-
     const setFromTotal = (total) => {
       total = Math.max(0, Math.min(MAX_TOTAL_SECONDS, total));
       minInput.value = Math.floor(total / 60);
       secInput.value = total % 60;
     };
 
-    const save = (state) => AP.storage.setTimerState(state);
+    function computeRemaining() {
+      if (cache.status === "running" && cache.endTime) {
+        return Math.max(0, Math.round((cache.endTime - Date.now()) / 1000));
+      }
+      if (cache.status === "paused") return cache.remaining || 0;
+      return inputSeconds();
+    }
+    function render() { display.textContent = fmtTime(computeRemaining()); }
 
-    function setButtons(isRunning) {
-      startBtn.disabled = isRunning;
-      pauseBtn.disabled = !isRunning;
-      stepBtns.forEach((b) => (b.disabled = isRunning));
-      minInput.disabled = isRunning;
-      secInput.disabled = isRunning;
+    function setButtons() {
+      const running = cache.status === "running";
+      startBtn.disabled = running;
+      pauseBtn.disabled = !running;
+      stepBtns.forEach((b) => (b.disabled = running));
+      quickBtns.forEach((b) => (b.disabled = running));
+      minInput.disabled = running;
+      secInput.disabled = running;
     }
 
-    quickBtns.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        if (running) return;
-        minInput.value = parseInt(btn.dataset.min, 10) || 0;
-        secInput.value = 0;
-        remaining = inputSeconds();
-        render();
-        save({ status: "idle", endTime: null, remaining: 0, minutesInput: parseInt(minInput.value, 10) || 0, secondsInput: 0 });
-      });
-    });
-
-    stepBtns.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        if (running) return;
-        const delta = parseInt(btn.dataset.step, 10) || 0;
-        setFromTotal(inputSeconds() + delta);
-        remaining = inputSeconds();
-        render();
-        save({ status: "idle", endTime: null, remaining: 0, minutesInput: parseInt(minInput.value, 10) || 0, secondsInput: parseInt(secInput.value, 10) || 0 });
-      });
-    });
+    function persist() { AP.storage.setSharedTimer(cache); }
 
     function startAlarm() {
+      if (alarmIntervalId) return;
       const id = AP.storage.getSettings().timerSound || "classic";
       let count = 0;
+      ensureAudio();
       playSound(id);
       alarmIntervalId = setInterval(() => {
         count++;
@@ -240,107 +247,155 @@
       display.classList.add("ap-alarm");
       if (alarmStopBtn) alarmStopBtn.style.display = "inline-flex";
     }
-
     function stopAlarm() {
       if (alarmIntervalId) clearInterval(alarmIntervalId);
       alarmIntervalId = null;
       display.classList.remove("ap-alarm");
       if (alarmStopBtn) alarmStopBtn.style.display = "none";
     }
-
     AP._timerAlarm = { start: startAlarm, stop: stopAlarm };
 
-    function tick() {
-      if (remaining <= 0) {
-        clearInterval(intervalId);
-        intervalId = null;
-        running = false;
-        setButtons(false);
-        startAlarm();
-        save({ status: "idle", endTime: null, remaining: 0 });
-        return;
-      }
-      remaining -= 1;
+    function handleFired(ts) {
+      ts = ts || Date.now();
+      if (ts === lastFiredHandled) return;
+      lastFiredHandled = ts;
+      cache.status = "idle";
+      cache.endTime = null;
+      cache.remaining = 0;
       render();
+      setButtons();
+      startAlarm();
     }
 
-    function startTicking() {
-      running = true;
-      setButtons(true);
-      if (intervalId) clearInterval(intervalId);
-      intervalId = setInterval(tick, 1000);
+    function displayLoop() {
+      if (displayId) clearInterval(displayId);
+      displayId = setInterval(() => {
+        render();
+        // Підстраховка на активній вкладці: якщо час вийшов, а фонове
+        // повідомлення ще не прийшло — оновлюємо стан кнопок.
+        if (cache.status === "running" && computeRemaining() <= 0) {
+          cache.status = "idle";
+          cache.endTime = null;
+          cache.remaining = 0;
+          setButtons();
+        }
+      }, 500);
     }
+
+    quickBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (cache.status === "running") return;
+        minInput.value = parseInt(btn.dataset.min, 10) || 0;
+        secInput.value = 0;
+        cache.status = "idle"; cache.endTime = null; cache.remaining = 0;
+        cache.min = parseInt(minInput.value, 10) || 0; cache.sec = 0;
+        render(); persist();
+      });
+    });
+
+    stepBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (cache.status === "running") return;
+        setFromTotal(inputSeconds() + (parseInt(btn.dataset.step, 10) || 0));
+        cache.status = "idle"; cache.endTime = null; cache.remaining = 0;
+        cache.min = parseInt(minInput.value, 10) || 0; cache.sec = parseInt(secInput.value, 10) || 0;
+        render(); persist();
+      });
+    });
 
     startBtn.addEventListener("click", () => {
       ensureAudio();
       stopAlarm();
-      if (remaining <= 0) remaining = inputSeconds();
-      if (remaining <= 0) return;
-      const endTime = Date.now() + remaining * 1000;
+      let secs = cache.status === "paused" ? (cache.remaining || 0) : inputSeconds();
+      if (secs <= 0) secs = inputSeconds();
+      if (secs <= 0) return;
+      cache.status = "running";
+      cache.endTime = Date.now() + secs * 1000;
+      cache.remaining = 0;
+      cache.min = parseInt(minInput.value, 10) || 0;
+      cache.sec = parseInt(secInput.value, 10) || 0;
+      persist();
+      sendSW({ type: "AP_TIMER_SET", endTime: cache.endTime });
+      setButtons();
       render();
-      startTicking();
-      save({ status: "running", endTime, remaining: 0 });
     });
 
     pauseBtn.addEventListener("click", () => {
-      if (intervalId) clearInterval(intervalId);
-      intervalId = null;
-      running = false;
-      setButtons(false);
-      save({ status: "paused", endTime: null, remaining });
+      cache.remaining = computeRemaining();
+      cache.status = "paused";
+      cache.endTime = null;
+      persist();
+      sendSW({ type: "AP_TIMER_CLEAR" });
+      setButtons();
+      render();
     });
 
     resetBtn.addEventListener("click", () => {
-      if (intervalId) clearInterval(intervalId);
-      intervalId = null;
-      running = false;
       stopAlarm();
-      remaining = inputSeconds();
+      cache.status = "idle";
+      cache.endTime = null;
+      cache.remaining = 0;
+      cache.min = parseInt(minInput.value, 10) || 0;
+      cache.sec = parseInt(secInput.value, 10) || 0;
+      persist();
+      sendSW({ type: "AP_TIMER_CLEAR" });
+      setButtons();
       render();
-      setButtons(false);
-      save({ status: "idle", endTime: null, remaining: 0 });
     });
 
     if (alarmStopBtn) alarmStopBtn.addEventListener("click", stopAlarm);
 
     [minInput, secInput].forEach((inp) => {
       inp.addEventListener("change", () => {
-        if (running) return;
+        if (cache.status === "running") return;
         setFromTotal(inputSeconds());
-        remaining = inputSeconds();
-        render();
-        save({ status: "idle", endTime: null, remaining: 0, minutesInput: parseInt(minInput.value, 10) || 0, secondsInput: parseInt(secInput.value, 10) || 0 });
+        cache.status = "idle"; cache.endTime = null; cache.remaining = 0;
+        cache.min = parseInt(minInput.value, 10) || 0; cache.sec = parseInt(secInput.value, 10) || 0;
+        render(); persist();
       });
     });
 
-    (function restore() {
-      const saved = AP.storage.getTimerState();
-      if (saved && typeof saved.minutesInput === "number") minInput.value = saved.minutesInput;
-      if (saved && typeof saved.secondsInput === "number") secInput.value = saved.secondsInput;
-
-      if (saved && saved.status === "running" && saved.endTime) {
-        const rem = Math.max(0, Math.round((saved.endTime - Date.now()) / 1000));
-        if (rem > 0) {
-          remaining = rem;
-          render();
-          startTicking();
-        } else {
-          remaining = 0;
-          render();
-          setButtons(false);
-          save({ status: "idle", endTime: null, remaining: 0 });
-        }
-      } else if (saved && saved.status === "paused") {
-        remaining = saved.remaining || 0;
-        render();
-        setButtons(false);
-      } else {
-        remaining = inputSeconds();
-        render();
+    function applyShared(t, live) {
+      if (!t) return;
+      cache = Object.assign({ status: "idle", endTime: null, remaining: 0, min: 0, sec: 0, fired: 0 }, t);
+      if (cache.status !== "running") {
+        if (typeof t.min === "number") minInput.value = t.min;
+        if (typeof t.sec === "number") secInput.value = t.sec;
       }
-    })();
+      render();
+      setButtons();
+      if (live && t.fired) handleFired(t.fired);
+    }
+
+    // Синхронізація між вкладками/сайтами
+    AP.storage.onSharedChange("alliancepro_timer", (t) => { if (t) applyShared(t, true); });
+
+    // Сигнал зі service worker (працює навіть коли вкладка у фоні)
+    if (hasRuntime()) {
+      try {
+        chrome.runtime.onMessage.addListener((msg) => {
+          if (msg && msg.type === "AP_TIMER_FIRED") handleFired(msg.ts || Date.now());
+        });
+      } catch (e) {}
+    }
+
+    // Початкове завантаження стану
+    AP.storage.getSharedTimer((t) => {
+      if (t) {
+        applyShared(t, false);
+        if (cache.status === "running" && computeRemaining() <= 0) {
+          cache.status = "idle"; cache.endTime = null; cache.remaining = 0;
+          persist(); render(); setButtons();
+        }
+      } else {
+        render(); setButtons();
+      }
+      displayLoop();
+    });
   }
 
+  // Будильник: теж глобальний і фоновий (chrome.storage + service worker),
+  // тож спрацьовує навіть коли вкладка неактивна, і синхронізований всюди.
   function initReminder() {
     const timeInput = document.getElementById("ap-rem-time");
     const toggle = document.getElementById("ap-rem-toggle");
@@ -348,8 +403,9 @@
     if (!timeInput || !toggle || reminderInited) return;
     reminderInited = true;
 
-    function refresh() {
-      const r = AP.storage.getReminder();
+    let lastFiredHandled = 0;
+
+    function refresh(r) {
       if (r && r.active) {
         timeInput.value = r.time;
         toggle.textContent = "Скасувати";
@@ -361,6 +417,14 @@
         toggle.textContent = "Поставити";
         if (status.textContent.indexOf("Будильник о") === 0) status.textContent = "";
       }
+    }
+
+    function computeWhen(t) {
+      const parts = t.split(":");
+      const d = new Date();
+      d.setHours(parseInt(parts[0], 10) || 0, parseInt(parts[1], 10) || 0, 0, 0);
+      if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
+      return d.getTime();
     }
 
     // Кнопки +час лише НАКОПИЧУЮТЬ час у полі (база — поточний час або вже
@@ -384,47 +448,57 @@
       b.addEventListener("click", () => addMinutes(parseInt(b.dataset.min, 10) || 0));
     });
 
-    function fire(r) {
-      AP.storage.setReminder(null);
-      status.textContent = "Будильник! (" + r.time + ")";
+    function fire(ts, time) {
+      ts = ts || Date.now();
+      if (ts === lastFiredHandled) return;
+      lastFiredHandled = ts;
+      status.textContent = "Будильник! (" + (time || timeInput.value || "") + ")";
       status.classList.add("ap-on");
-      refresh();
+      toggle.textContent = "Поставити";
       ensureAudio();
       if (AP._timerAlarm) AP._timerAlarm.start();
       else playSound(AP.storage.getSettings().timerSound || "classic");
     }
 
-    function check() {
-      const r = AP.storage.getReminder();
-      if (!r || !r.active) return;
-      const now = new Date();
-      const hh = String(now.getHours()).padStart(2, "0");
-      const mm = String(now.getMinutes()).padStart(2, "0");
-      if (r.time === hh + ":" + mm) fire(r);
-    }
-
     toggle.addEventListener("click", () => {
-      const r = AP.storage.getReminder();
-      if (r && r.active) {
-        AP.storage.setReminder(null);
-        status.textContent = "";
-        status.classList.remove("ap-on");
-        refresh();
-        return;
-      }
-      const t = timeInput.value;
-      if (!t) {
-        AP.ui && AP.ui.alert({ title: "Вкажіть час", text: "Оберіть час для нагадування." });
-        return;
-      }
-      ensureAudio();
-      AP.storage.setReminder({ time: t, active: true });
-      refresh();
+      AP.storage.getSharedReminder((r) => {
+        if (r && r.active) {
+          AP.storage.setSharedReminder({ time: r.time, active: false, when: null });
+          sendSW({ type: "AP_REMINDER_CLEAR" });
+          status.textContent = "";
+          status.classList.remove("ap-on");
+          refresh(null);
+          return;
+        }
+        const t = timeInput.value;
+        if (!t) {
+          AP.ui && AP.ui.alert({ title: "Вкажіть час", text: "Оберіть час для нагадування." });
+          return;
+        }
+        ensureAudio();
+        const when = computeWhen(t);
+        AP.storage.setSharedReminder({ time: t, active: true, when: when });
+        sendSW({ type: "AP_REMINDER_SET", when: when });
+        refresh({ time: t, active: true });
+      });
     });
 
-    setInterval(check, 10000);
-    check();
-    refresh();
+    // Синхронізація між вкладками
+    AP.storage.onSharedChange("alliancepro_reminder", (r) => {
+      refresh(r && r.active ? r : null);
+      if (r && r.fired) fire(r.fired, r.time);
+    });
+
+    // Сигнал зі service worker
+    if (hasRuntime()) {
+      try {
+        chrome.runtime.onMessage.addListener((msg) => {
+          if (msg && msg.type === "AP_REMINDER_FIRED") fire(msg.ts || Date.now());
+        });
+      } catch (e) {}
+    }
+
+    AP.storage.getSharedReminder((r) => refresh(r && r.active ? r : null));
   }
 
   AP.calculator = { init, playSound, SOUNDS };

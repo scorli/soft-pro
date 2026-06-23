@@ -23,6 +23,54 @@
     else el.textContent = cid;
   }
 
+  // Шукає лише числовий CID у повідомленнях чату (без відкриття РС).
+  function detectNumericCid(chatId) {
+    const messages = Array.from(
+      document.querySelectorAll(
+        `.sf_chat_msg_holder [data-user-id="${chatId}"] .sf_chat_msg_text_message`
+      )
+    );
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i].textContent.trim().match(/\)\s(\d+):/);
+      if (m && m[1]) return m[1];
+    }
+    return null;
+  }
+
+  let autoObserver = null;
+
+  // Авто-визначення CID при відкритті/перемиканні чату: одразу показує
+  // збережений ID, інакше сканує повідомлення (з невеликим спостерігачем,
+  // бо вони підвантажуються не миттєво) і підставляє знайдений CID.
+  function autoDetectCid() {
+    if (autoObserver) { autoObserver.disconnect(); autoObserver = null; }
+
+    const chatId = activeChatId();
+    updateClientIdDisplay(chatId);
+    if (!chatId) return;
+    if (AP.storage.getChatData(chatId).cid) return;
+
+    function tryDetect() {
+      if (activeChatId() !== chatId) return true;
+      const found = detectNumericCid(chatId);
+      if (found) {
+        setCid(chatId, found);
+        updateClientIdDisplay(chatId);
+        return true;
+      }
+      return false;
+    }
+
+    if (tryDetect()) return;
+
+    const holder = document.querySelector(".sf_chat_msg_holder") || document.body;
+    autoObserver = new MutationObserver(() => {
+      if (tryDetect()) { autoObserver.disconnect(); autoObserver = null; }
+    });
+    autoObserver.observe(holder, { childList: true, subtree: true });
+    setTimeout(() => { if (autoObserver) { autoObserver.disconnect(); autoObserver = null; } }, 10000);
+  }
+
   function openClientDesktop() {
     const chatId = activeChatId();
     if (!chatId) {
@@ -111,6 +159,7 @@
   AP.operatordesk = {
     openClientDesktop,
     updateClientIdDisplay,
+    autoDetectCid,
     editClientCid,
     clearClientCid
   };

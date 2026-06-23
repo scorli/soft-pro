@@ -387,6 +387,12 @@
       AP.storage.getSettings().resetAfterCopy,
       (on) => AP.storage.patchSettings({ resetAfterCopy: on })
     ));
+    body.appendChild(rowToggle(
+      "Автоочищення раз на добу",
+      "Раз на день автоматично очищає дані всіх чатів",
+      AP.storage.getSettings().autoClearDaily,
+      (on) => AP.storage.patchSettings({ autoClearDaily: on })
+    ));
     body.appendChild(rowButton(
       "Налаштування чекбоксів",
       "Пункти, варіанти, порядок, імпорт/експорт",
@@ -398,6 +404,12 @@
       "Посилання у вкладці «Нотатки» (назва + URL)",
       "Відкрити",
       () => { removeModal(); showLinksConfig(); }
+    ));
+    body.appendChild(rowButton(
+      "Калькулятор на інших сайтах",
+      "Сайти, де показувати міні-панель (калькулятор + таймер)",
+      "Відкрити",
+      () => { removeModal(); showSitesConfig(); }
     ));
     body.appendChild(allSettingsRow());
     body.appendChild(rowButton(
@@ -424,7 +436,7 @@
 
     const footer = document.createElement("div");
     footer.className = "ap-modal-footer";
-    footer.textContent = "Alliance Pro v2.9 by @Nilfa";
+    footer.textContent = "Alliance Pro v3.2.3 by @Nilfa";
     wrap.appendChild(footer);
 
     const m = makeModal(wrap);
@@ -527,6 +539,94 @@
     });
     const addBtn = document.querySelector(".ap-links-add");
     if (addBtn) addBtn.disabled = workingLinks.length >= MAX_LINKS;
+  }
+
+  let workingSites = [];
+
+  function showSitesConfig() {
+    const wrap = document.createElement("div");
+    const { h, x } = header("Калькулятор на інших сайтах");
+    wrap.appendChild(h);
+
+    const body = document.createElement("div");
+    body.className = "ap-modal-body";
+
+    const hint = document.createElement("p");
+    hint.className = "ap-setting-sub";
+    hint.style.marginTop = "0";
+    hint.textContent = "Вкажіть домени (напр. example.com), де показувати міні-панель із калькулятором і таймером. Після зміни оновіть відповідну вкладку.";
+    body.appendChild(hint);
+
+    const list = document.createElement("div");
+    list.id = "ap-sites-list";
+    body.appendChild(list);
+
+    const addBtn = document.createElement("button");
+    addBtn.className = "ap-btn ap-btn-ghost ap-links-add";
+    addBtn.textContent = "+ Додати сайт";
+    addBtn.addEventListener("click", () => { workingSites.push(""); renderSitesList(); });
+    body.appendChild(addBtn);
+    wrap.appendChild(body);
+
+    const actions = document.createElement("div");
+    actions.className = "ap-modal-actions ap-modal-actions-split";
+    const back = document.createElement("button");
+    back.className = "ap-btn ap-btn-ghost";
+    back.textContent = "Назад";
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "ap-btn ap-btn-primary";
+    saveBtn.textContent = "Зберегти";
+    actions.appendChild(back);
+    actions.appendChild(saveBtn);
+    wrap.appendChild(actions);
+
+    const m = makeModal(wrap);
+    x.addEventListener("click", () => { m.close(); showSettings(); });
+    back.addEventListener("click", () => { m.close(); showSettings(); });
+    saveBtn.addEventListener("click", () => {
+      const cleaned = workingSites
+        .map((s) => (s || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, ""))
+        .filter(Boolean);
+      AP.storage.setAllowedSites(cleaned, () => {
+        m.close();
+        uiAlert({ title: "Збережено", text: "Список сайтів збережено. Оновіть потрібні вкладки, щоб зʼявилася панель." });
+      });
+    });
+
+    workingSites = [];
+    renderSitesList();
+    AP.theme.apply(AP.theme.current());
+    AP.storage.getAllowedSites((listVal) => {
+      workingSites = (listVal || []).slice();
+      renderSitesList();
+    });
+  }
+
+  function renderSitesList() {
+    const list = document.getElementById("ap-sites-list");
+    if (!list) return;
+    list.innerHTML = "";
+    if (!workingSites.length) {
+      const empty = document.createElement("p");
+      empty.className = "ap-setting-sub";
+      empty.textContent = "Поки що порожньо. Додайте домен нижче.";
+      list.appendChild(empty);
+    }
+    workingSites.forEach((site, index) => {
+      const row = document.createElement("div");
+      row.className = "ap-links-row";
+      const inp = document.createElement("input");
+      inp.type = "text";
+      inp.className = "ap-input";
+      inp.placeholder = "example.com";
+      inp.value = site || "";
+      inp.addEventListener("input", () => (workingSites[index] = inp.value));
+      const del = iconBtn("×", "Видалити", () => { workingSites.splice(index, 1); renderSitesList(); });
+      del.classList.add("ap-cfg-del");
+      row.appendChild(inp);
+      row.appendChild(del);
+      list.appendChild(row);
+    });
   }
 
   let workingConfig = [];
@@ -898,7 +998,7 @@
 
   function exportConfig() {
     downloadJson(
-      { app: "Alliance Pro", type: "checkboxes", version: "2.9", timestamp: new Date().toISOString(), checkboxConfig: workingConfig },
+      { app: "Alliance Pro", type: "checkboxes", version: "3.2.3", timestamp: new Date().toISOString(), checkboxConfig: workingConfig },
       `alliance-pro-checkboxes-${stamp()}.json`
     );
   }

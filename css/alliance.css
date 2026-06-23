@@ -697,15 +697,36 @@
 .ap-profile-bar { display: flex; }
 .ap-profile-select { width: 100%; font-weight: 600; }
 
+.ap-mood { display: flex; flex-wrap: wrap; gap: 6px; }
+.ap-mood-chip {
+  flex: 1 1 calc(50% - 6px);
+  padding: 7px 8px;
+  border: 1px solid var(--ap-border);
+  border-radius: 9px;
+  background: var(--ap-surface-2);
+  color: var(--ap-text);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.12s, background 0.12s, border-color 0.12s;
+}
+.ap-mood-chip:hover { border-color: var(--ap-accent); }
+.ap-mood-chip.ap-mood-on {
+  background: var(--ap-accent);
+  color: var(--ap-accent-text);
+  border-color: var(--ap-accent);
+}
+
 .ap-links { display: flex; flex-wrap: wrap; gap: 6px; }
 .ap-link-chip {
   display: inline-flex;
   align-items: center;
+  gap: 5px;
   max-width: 100%;
-  padding: 5px 10px;
-  border: 1px solid var(--ap-border);
+  padding: 6px 11px;
+  border: 1px solid var(--ap-accent);
   border-radius: 8px;
-  background: var(--ap-surface-2);
+  background: var(--ap-accent-soft);
   color: var(--ap-accent);
   font-size: 12.5px;
   font-weight: 600;
@@ -714,8 +735,26 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: background 0.12s ease, box-shadow 0.12s ease, transform 0.05s ease;
 }
-.ap-link-chip:hover { border-color: var(--ap-accent); filter: brightness(1.06); }
+.ap-link-chip::before { content: "🔗"; font-size: 11px; opacity: 0.9; }
+.ap-link-chip:hover {
+  background: var(--ap-accent);
+  color: var(--ap-accent-text);
+  box-shadow: 0 2px 8px var(--ap-accent-soft);
+}
+.ap-link-chip:active { transform: translateY(1px); }
+/* Темна тема: робимо посилання помітнішими */
+:root[data-ap-theme="dark"] .ap-link-chip {
+  background: rgba(111, 125, 255, 0.28);
+  border-color: var(--ap-accent);
+  color: #dfe3ff;
+  box-shadow: inset 0 0 0 1px rgba(111, 125, 255, 0.15);
+}
+:root[data-ap-theme="dark"] .ap-link-chip:hover {
+  background: var(--ap-accent);
+  color: #ffffff;
+}
 .ap-links-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .ap-links-name { flex: 0 0 35%; }
 .ap-links-url { flex: 1; }

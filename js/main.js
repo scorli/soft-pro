@@ -49,8 +49,13 @@
 
             <div id="ap-checkboxes" class="ap-checkboxes"></div>
 
+            <div class="ap-field" id="ap-mood-field">
+              <label class="ap-field-label">🙂 Настрій клієнта</label>
+              <div id="ap-mood" class="ap-mood"></div>
+            </div>
+
             <div class="ap-field">
-              <label class="ap-field-label" for="ap-comment">Комент</label>
+              <label class="ap-field-label" for="ap-comment">💬 Комент</label>
               <textarea id="ap-comment" class="ap-textarea" rows="2" placeholder="Додатковий коментар…"></textarea>
             </div>
 
@@ -270,7 +275,21 @@
   function loadForChat() {
     AP.checklist.load();
     AP.notes.load();
-    AP.operatordesk.updateClientIdDisplay(AP.getActiveChatId());
+    AP.operatordesk.autoDetectCid();
+  }
+
+  function todayKey() {
+    const d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  function maybeAutoClear() {
+    const s = AP.storage.getSettings();
+    if (!s.autoClearDaily) return;
+    const today = todayKey();
+    if (s.lastAutoClear === today) return;
+    AP.storage.clearAllChatData();
+    AP.storage.patchSettings({ lastAutoClear: today });
   }
 
   function init() {
@@ -279,6 +298,7 @@
     const container = buildPanel();
     if (!container) return;
 
+    maybeAutoClear();
     AP.theme.init();
     wireHeader(container);
 
