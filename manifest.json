@@ -1,15 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "Alliance Pro",
-  "version": "3.2.3",
-  "description": "Чек-лист (Зроблено/Залишилось/Комент), таймер зі звуком і нагадуванням, калькулятор і нотатки для chat.sender.ftband.net. Калькулятор і таймер можна вмикати на інших сайтах.",
+  "name": "Soft Pro",
+  "version": "4.7",
+  "description": "Робоча панель оператора: чек-лист за подіями (341/ДВЗ/349/290-353), режим Чат/Телефонія, таймер, калькулятор і нотатки для chat.sender.ftband.net. Калькулятор і таймер можна вмикати на інших сайтах.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "Alliance Pro",
+    "default_title": "Soft Pro",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",

@@ -42,7 +42,7 @@
   top: 78px;
   right: 22px;
   z-index: 2147483000;
-  width: min(344px, calc(100vw - 28px));
+  width: min(384px, calc(100vw - 28px));
   max-height: calc(100vh - 110px);
   display: flex;
   flex-direction: column;
@@ -107,11 +107,33 @@
 .ap-body {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
   transition: max-height 0.2s ease;
 }
-.ap-body.ap-collapsed { max-height: 0; }
+.ap-body.ap-collapsed { max-height: 0; flex: 0 0 auto; }
+
+/* Ручка зміни висоти (внизу панелі) */
+.ap-resize-handle {
+  flex: 0 0 auto;
+  height: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ns-resize;
+  background: var(--ap-bg);
+  border-top: 1px solid var(--ap-border);
+  touch-action: none;
+}
+.ap-resize-grip {
+  width: 40px;
+  height: 4px;
+  border-radius: 3px;
+  background: var(--ap-border);
+  transition: background 0.15s ease;
+}
+.ap-resize-handle:hover .ap-resize-grip { background: var(--ap-accent); }
 
 .ap-tabs {
   display: flex;
@@ -142,7 +164,11 @@
 .ap-panes {
   padding: 14px;
   overflow-y: auto;
+  flex: 1 1 auto;
   min-height: 0;
+  /* Завжди резервуємо місце під вертикальний повзунок, щоб поява/зникнення
+     повзунка не зміщувала вміст (кнопка «Відкрити РС» не з'їжджає). */
+  scrollbar-gutter: stable;
 }
 .ap-pane { display: none; flex-direction: column; gap: 14px; }
 .ap-pane-active { display: flex; }
@@ -326,10 +352,10 @@
   border: 1px solid var(--ap-border);
   border-radius: 10px;
   background: var(--ap-surface);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 .ap-cid-label { font-weight: 600; color: var(--ap-text-soft); }
-.ap-cid-value { font-weight: 700; color: var(--ap-text); min-width: 60px; }
+.ap-cid-value { font-weight: 700; color: var(--ap-text); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ap-cid-icon {
   color: var(--ap-text-soft);
   width: 26px;
@@ -337,7 +363,9 @@
   background: var(--ap-surface-2);
 }
 .ap-cid-icon:hover { color: var(--ap-accent); background: var(--ap-border); }
-.ap-cid-bar .ap-btn-accent { margin-left: auto; padding: 7px 13px; }
+.ap-cid-bar .ap-btn-accent { margin-left: auto; padding: 7px 13px; flex: 0 0 auto; white-space: nowrap; }
+.ap-cid-bar .ap-cid-icon { flex: 0 0 auto; }
+.ap-cid-label { flex: 0 0 auto; }
 
 .ap-timer-display {
   font-size: 46px;
@@ -765,10 +793,17 @@
 
 .ap-compact .ap-panes { padding: 12px; }
 .ap-compact .ap-pane { gap: 10px; }
-.ap-compact [data-pane="checklist"] > #ap-profile-bar,
-.ap-compact [data-pane="checklist"] > #ap-checkboxes,
-.ap-compact [data-pane="checklist"] > .ap-field,
-.ap-compact [data-pane="checklist"] > .ap-actions { display: none !important; }
+/* Компактний режим чек-листа: лишаємо пошук ID + РС, номер події та «Підтягнути» */
+.ap-compact [data-pane="checklist"] > #ap-mode-banner,
+.ap-compact [data-pane="checklist"] > #ap-subevents,
+.ap-compact [data-pane="checklist"] > #ap-steps,
+.ap-compact [data-pane="checklist"] > #ap-mood-field,
+.ap-compact [data-pane="checklist"] > .ap-result-row,
+.ap-compact [data-pane="checklist"] > .ap-notes-block { display: none !important; }
+/* В діях лишаємо тільки «Підтягнути» */
+.ap-compact [data-pane="checklist"] > .ap-actions > #ap-copy-btn,
+.ap-compact [data-pane="checklist"] > .ap-actions > #ap-reset-btn,
+.ap-compact [data-pane="checklist"] > .ap-actions > #ap-copy-status { display: none !important; }
 .ap-compact [data-pane="timer"] > .ap-timer-inputs,
 .ap-compact [data-pane="timer"] > .ap-quick,
 .ap-compact [data-pane="timer"] > .ap-reminder { display: none; }
@@ -806,4 +841,206 @@
 @media (max-height: 620px) {
   #alliance-pro-container { top: 12px; max-height: calc(100vh - 24px); }
   #ap-restore { top: 12px; }
+}
+
+/* ===== v4.0: об'єднаний чек-лист (події/кроки колеги) ===== */
+.ap-mode-btn.ap-mode-phone { color: var(--ap-accent-text); background: var(--ap-accent); }
+
+.ap-mode-banner {
+  font-size: 12px; font-weight: 700; color: var(--ap-text-soft);
+  padding: 2px 2px 6px; letter-spacing: 0.2px;
+}
+
+/* Події */
+.ap-events { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.ap-ev-btn {
+  flex: 1 1 auto; min-width: 56px; padding: 7px 8px; border: 1px solid var(--ap-border);
+  border-radius: 9px; background: var(--ap-surface-2); color: var(--ap-text);
+  font-size: 13px; font-weight: 700; cursor: pointer; position: relative;
+  transition: background .12s, border-color .12s;
+}
+.ap-ev-btn:hover { border-color: var(--ap-accent); }
+.ap-ev-btn.ap-ev-active { background: var(--ap-accent); color: var(--ap-accent-text); border-color: var(--ap-accent); }
+.ap-ev-btn.ap-ev-progress::after {
+  content: ""; position: absolute; top: 5px; right: 6px; width: 7px; height: 7px;
+  border-radius: 50%; background: var(--ap-checkbox-green, #34c759);
+}
+.ap-subevents { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.ap-subevents:empty { display: none; margin: 0; }
+.ap-subev-btn {
+  flex: 1 1 auto; padding: 5px 8px; border: 1px solid var(--ap-border);
+  border-radius: 8px; background: var(--ap-surface-2); color: var(--ap-text);
+  font-size: 12px; font-weight: 600; cursor: pointer; position: relative;
+}
+.ap-subev-btn:hover { border-color: var(--ap-accent); }
+.ap-subev-btn.ap-ev-active { background: var(--ap-accent); color: var(--ap-accent-text); border-color: var(--ap-accent); }
+.ap-subev-btn.ap-ev-progress::after {
+  content: ""; position: absolute; top: 4px; right: 5px; width: 6px; height: 6px;
+  border-radius: 50%; background: var(--ap-checkbox-green, #34c759);
+}
+
+/* Кроки */
+.ap-steps { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+.ap-step-header {
+  font-size: 12.5px; font-weight: 800; color: var(--ap-text);
+  margin: 8px 0 2px; opacity: 0.92;
+}
+.ap-step {
+  display: flex; align-items: center; gap: 7px; padding: 5px 8px;
+  border: 1px solid transparent; border-radius: 8px; font-size: 13px;
+  color: var(--ap-text); cursor: pointer;
+}
+.ap-step:hover { background: var(--ap-surface-2); }
+.ap-step input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--ap-accent); cursor: pointer; flex: 0 0 auto; }
+.ap-step.ap-step-checked {
+  background: var(--ap-checkbox-green-bg, rgba(52,199,89,0.12));
+  border-color: var(--ap-checkbox-green-border, rgba(52,199,89,0.22));
+}
+
+/* Групи (Торг / Кроки) */
+.ap-grp-section { margin: 2px 0 4px; }
+.ap-grp-title { font-size: 11.5px; font-weight: 700; color: var(--ap-text-soft); margin: 4px 0 3px; }
+.ap-grp-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.ap-grp-btn {
+  padding: 6px 10px; border: 1px solid var(--ap-border); border-radius: 8px;
+  background: var(--ap-surface-2); color: var(--ap-text); font-size: 12.5px;
+  font-weight: 600; cursor: pointer;
+}
+.ap-grp-btn:hover { border-color: var(--ap-accent); }
+.ap-grp-btn.active { background: var(--ap-accent); color: var(--ap-accent-text); border-color: var(--ap-accent); }
+
+/* Місяці ДВЗ */
+.ap-months { flex-direction: column; align-items: stretch; gap: 6px; }
+.ap-months-check { display: flex; align-items: center; gap: 7px; font-size: 13px; cursor: pointer; }
+.ap-months-check input { width: 16px; height: 16px; accent-color: var(--ap-accent); }
+.ap-months-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.ap-month-btn {
+  padding: 5px 11px; border: 1px solid var(--ap-border); border-radius: 8px;
+  background: var(--ap-surface-2); color: var(--ap-text); font-size: 12.5px;
+  font-weight: 600; cursor: pointer;
+}
+.ap-month-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.ap-month-btn.active { background: var(--ap-accent); color: var(--ap-accent-text); border-color: var(--ap-accent); }
+
+/* Умови ДВЗ (погодився/відмовився) */
+.ap-dvz-terms { justify-content: space-between; }
+.ap-dvz-terms-buttons { display: flex; gap: 5px; margin-left: auto; }
+.ap-dvz-terms-btn {
+  width: 26px; height: 26px; border: 1px solid var(--ap-border); border-radius: 7px;
+  background: var(--ap-surface-2); color: var(--ap-text); font-size: 13px; font-weight: 800; cursor: pointer;
+}
+.ap-dvz-terms-btn.active { background: var(--ap-accent); color: var(--ap-accent-text); border-color: var(--ap-accent); }
+.ap-dvz-terms.ap-dvz-ready { background: var(--ap-checkbox-green-bg, rgba(52,199,89,0.12)); border-color: var(--ap-checkbox-green-border, rgba(52,199,89,0.3)); }
+.ap-dvz-terms.ap-dvz-decline { background: var(--ap-danger-bg, rgba(239,68,68,0.12)); border-color: var(--ap-danger-border, rgba(239,68,68,0.3)); }
+
+/* Згортні нотатки */
+.ap-notes-block { margin-bottom: 8px; }
+.ap-notes-toggle {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 10px; border: 1px solid var(--ap-border); border-radius: 9px;
+  background: var(--ap-surface-2); color: var(--ap-text); font-size: 12.5px;
+  font-weight: 700; cursor: pointer;
+}
+.ap-notes-toggle:hover { border-color: var(--ap-accent); }
+.ap-notes-chev { font-size: 10px; opacity: 0.7; }
+.ap-cl-notes-area { margin-top: 6px; }
+.ap-notes-block.is-collapsed .ap-cl-notes-area { display: none; }
+
+/* ===== v4.0.1: компактний настрій (лише смайлики, з кольором) + поле внизу ===== */
+.ap-mood-field { display: flex; align-items: center; gap: 10px; }
+.ap-mood-field .ap-field-label { margin: 0; white-space: nowrap; }
+.ap-mood.ap-mood-compact { gap: 6px; }
+.ap-mood-compact .ap-mood-chip {
+  flex: 0 0 auto;
+  width: 34px; height: 30px;
+  padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 16px; line-height: 1;
+  border-radius: 8px;
+  filter: grayscale(0.35); opacity: 0.7;
+}
+.ap-mood-compact .ap-mood-chip:hover { opacity: 1; filter: none; }
+.ap-mood-compact .ap-mood-chip.ap-mood-on { opacity: 1; filter: none; color: #fff; }
+.ap-mood-compact .ap-mood-positive.ap-mood-on { background: #34c759; border-color: #2aa64a; }
+.ap-mood-compact .ap-mood-neutral.ap-mood-on  { background: #9aa3af; border-color: #828b97; }
+.ap-mood-compact .ap-mood-negative.ap-mood-on { background: #ef4444; border-color: #d23b3b; }
+
+/* ===== v4.2: результат комунікації + історія ===== */
+.ap-result-row { display: flex; align-items: center; gap: 10px; }
+.ap-result-label { font-size: 12.5px; font-weight: 700; color: var(--ap-text-soft); white-space: nowrap; }
+.ap-result-select {
+  flex: 1 1 auto;
+  padding: 6px 9px;
+  border: 1px solid var(--ap-border);
+  border-radius: 8px;
+  background: var(--ap-surface-2);
+  color: var(--ap-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ap-result-select:hover { border-color: var(--ap-accent); }
+
+.ap-hist-empty { color: var(--ap-text-soft); font-size: 13px; padding: 8px 2px; }
+.ap-hist-item {
+  border: 1px solid var(--ap-border);
+  border-radius: 10px;
+  padding: 9px 11px;
+  margin-bottom: 8px;
+  background: var(--ap-surface);
+}
+.ap-hist-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ap-hist-id { font-weight: 700; color: var(--ap-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ap-hist-badge {
+  flex: 0 0 auto;
+  font-size: 12px; font-weight: 700;
+  padding: 2px 8px; border-radius: 999px;
+  background: var(--ap-accent-soft); color: var(--ap-accent);
+}
+.ap-hist-meta { font-size: 12px; color: var(--ap-text-soft); margin: 4px 0 8px; }
+.ap-hist-actions { display: flex; gap: 8px; }
+.ap-hist-actions .ap-btn { flex: 1 1 auto; }
+.ap-hist-footer { display: flex; justify-content: flex-end; }
+
+/* ===== v4.3: настрій у вигляді рядка (як інші пункти) + компактна висота ===== */
+.ap-mood-row { display: flex; align-items: center; gap: 10px; }
+.ap-mood-label { font-size: 12.5px; font-weight: 700; color: var(--ap-text-soft); white-space: nowrap; }
+.ap-mood-row .ap-mood { justify-content: flex-start; }
+/* У компактному режимі ручка зміни висоти не потрібна */
+.ap-compact .ap-resize-handle { display: none; }
+
+/* Банер синхронізації (знайдено прогрес попереднього оператора) */
+.ap-sync-banner {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 10px;
+  background: var(--ap-accent-soft); border: 1px solid var(--ap-accent);
+  font-size: 12.5px; font-weight: 600; color: var(--ap-text);
+}
+.ap-sync-banner #ap-sync-text { flex: 1 1 auto; }
+.ap-sync-banner .ap-btn { padding: 5px 10px; }
+.ap-sync-banner .ap-icon-btn { width: 24px; height: 24px; color: var(--ap-text-soft); }
+
+/* Циклічність + Негатив поряд у дві колонки */
+.ap-cycneg { display: flex; gap: 10px; align-items: flex-start; }
+.ap-cycneg-col { flex: 1 1 0; min-width: 0; }
+.ap-cycneg-head {
+  font-size: 12.5px; font-weight: 800; color: var(--ap-text);
+  margin: 8px 0 4px; opacity: 0.92;
+}
+
+/* Перегляд кейсу з історії ("Показати") */
+.ap-hist-pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ap-text);
+  background: var(--ap-surface-2);
+  border: 1px solid var(--ap-border);
+  border-radius: 10px;
+  padding: 12px;
+  margin: 0;
+  max-height: 50vh;
+  overflow: auto;
 }

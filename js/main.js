@@ -23,10 +23,11 @@
       <div class="ap-header" id="ap-drag-handle">
         <div class="ap-brand">
           <span class="ap-brand-dot"></span>
-          <span>Alliance&nbsp;Pro</span>
+          <span>Soft&nbsp;Pro</span>
         </div>
         <div class="ap-header-actions">
-          <button class="ap-icon-btn ap-theme-btn" title="Темна тема">🌙</button>
+          <button class="ap-icon-btn ap-mode-btn" id="ap-mode-btn" title="Режим: Чат / Телефонія">💬</button>
+          <button class="ap-icon-btn" id="ap-history-btn" title="Історія (останні 10)">📋</button>
           <button class="ap-icon-btn" id="ap-compact-btn" title="Компактний режим">⊟</button>
           <button class="ap-icon-btn ap-bright-btn" id="ap-settings-btn" title="Налаштування">⚙️</button>
           <button class="ap-icon-btn" id="ap-home-btn" title="На місце">⌂</button>
@@ -45,37 +46,49 @@
 
         <div class="ap-panes">
           <section class="ap-pane" data-pane="checklist">
-            <div id="ap-profile-bar" class="ap-profile-bar" style="display:none"></div>
-
-            <div id="ap-checkboxes" class="ap-checkboxes"></div>
-
-            <div class="ap-field" id="ap-mood-field">
-              <label class="ap-field-label">🙂 Настрій клієнта</label>
-              <div id="ap-mood" class="ap-mood"></div>
-            </div>
-
-            <div class="ap-field">
-              <label class="ap-field-label" for="ap-comment">💬 Комент</label>
-              <textarea id="ap-comment" class="ap-textarea" rows="2" placeholder="Додатковий коментар…"></textarea>
-            </div>
-
-            <div class="ap-field">
-              <label class="ap-field-label">Текст для копіювання</label>
-              <pre id="ap-preview" class="ap-preview"></pre>
-            </div>
-
-            <div class="ap-actions">
-              <button id="ap-copy-btn" class="ap-btn ap-btn-primary">Скопіювати</button>
-              <button id="ap-reset-btn" class="ap-btn ap-btn-ghost">Скинути</button>
-              <span id="ap-copy-status" class="ap-status"></span>
-            </div>
-
             <div class="ap-cid-bar">
               <span class="ap-cid-label">ID:</span>
               <span id="ap-cid-value" class="ap-cid-value">Не знайдено</span>
               <button id="ap-cid-edit" class="ap-icon-btn ap-cid-icon" title="Редагувати ID">✎</button>
               <button id="ap-cid-clear" class="ap-icon-btn ap-cid-icon" title="Очистити ID">⌫</button>
               <button id="ap-open-desktop" class="ap-btn ap-btn-accent">Відкрити РС</button>
+            </div>
+
+            <div id="ap-mode-banner" class="ap-mode-banner" style="display:none"></div>
+
+            <div id="ap-sync-banner" class="ap-sync-banner" style="display:none">
+              <span id="ap-sync-text">🔁 Знайдено прогрес попереднього оператора</span>
+              <button id="ap-sync-apply" class="ap-btn ap-btn-primary">Застосувати</button>
+              <button id="ap-sync-dismiss" class="ap-icon-btn" title="Сховати">✕</button>
+            </div>
+
+            <div id="ap-events" class="ap-events"></div>
+            <div id="ap-subevents" class="ap-subevents"></div>
+
+            <div id="ap-steps" class="ap-steps"></div>
+
+            <div class="ap-mood-row" id="ap-mood-field">
+              <span class="ap-mood-label">🙂 Настрій:</span>
+              <div id="ap-mood" class="ap-mood ap-mood-compact"></div>
+            </div>
+
+            <div class="ap-result-row">
+              <span class="ap-result-label">🏁 Результат:</span>
+              <select id="ap-result" class="ap-result-select"></select>
+            </div>
+
+            <div class="ap-notes-block is-collapsed" id="ap-cl-notes-block">
+              <button type="button" class="ap-notes-toggle" id="ap-cl-notes-toggle">
+                <span>📝 Нотатки</span><span class="ap-notes-chev">▼</span>
+              </button>
+              <textarea id="ap-comment" class="ap-textarea ap-cl-notes-area" rows="3" placeholder="Коротко: що сказав клієнт, домовленості, тригери…"></textarea>
+            </div>
+
+            <div class="ap-actions">
+              <button id="ap-copy-btn" class="ap-btn ap-btn-primary">Скопіювати</button>
+              <button id="ap-reset-btn" class="ap-btn ap-btn-ghost">Скинути</button>
+              <button id="ap-pull-btn" class="ap-btn ap-btn-accent" title="Підтягнути прогрес із токена (з чату або буфера обміну)">⤵️ Підтягнути</button>
+              <span id="ap-copy-status" class="ap-status"></span>
             </div>
           </section>
 
@@ -169,6 +182,10 @@
           </section>
         </div>
       </div>
+
+      <div class="ap-resize-handle" id="ap-resize-handle" title="Перетягніть, щоб змінити висоту">
+        <span class="ap-resize-grip"></span>
+      </div>
     `;
   }
 
@@ -186,8 +203,8 @@
     if (!document.getElementById("ap-restore")) {
       const restore = document.createElement("button");
       restore.id = "ap-restore";
-      restore.title = "Alliance Pro";
-      restore.textContent = "AP";
+      restore.title = "Soft Pro";
+      restore.textContent = "SP";
       restore.style.display = "none";
       restore.addEventListener("click", showPanel);
       host.appendChild(restore);
@@ -222,14 +239,42 @@
     AP.storage.patchSettings({ activeTab: tab });
   }
 
+  function applyModeButton(container) {
+    const btn = container.querySelector("#ap-mode-btn");
+    if (!btn) return;
+    const mode = AP.storage.getSettings().mode || "chat";
+    const phone = mode === "phone";
+    btn.textContent = phone ? "📞" : "💬";
+    btn.title = phone ? "Режим: Телефонія (натисніть для Чату)" : "Режим: Чат (натисніть для Телефонії)";
+    btn.classList.toggle("ap-mode-phone", phone);
+  }
+
   function wireHeader(container) {
-    container.querySelector(".ap-theme-btn").addEventListener("click", () => AP.theme.toggle());
+    const modeBtn = container.querySelector("#ap-mode-btn");
+    if (modeBtn) {
+      modeBtn.addEventListener("click", () => {
+        const cur = AP.storage.getSettings().mode || "chat";
+        AP.storage.patchSettings({ mode: cur === "phone" ? "chat" : "phone" });
+        applyModeButton(container);
+        AP.checklist.applyConfig();
+      });
+    }
+    applyModeButton(container);
 
     const compactBtn = container.querySelector("#ap-compact-btn");
     function applyCompact(on) {
       container.classList.toggle("ap-compact", on);
       compactBtn.textContent = on ? "⊞" : "⊟";
       compactBtn.title = on ? "Звичайний розмір" : "Компактний режим";
+      if (on) {
+        // Компактний режим завжди має стандартну (авто) висоту,
+        // ручна висота тимчасово скидається.
+        container.style.height = "";
+        container.style.maxHeight = "";
+      } else {
+        // Повертаємо збережену ручну висоту (якщо була)
+        applyPanelHeight(AP.storage.getSettings().panelHeight);
+      }
     }
     applyCompact(!!AP.storage.getSettings().compact);
     compactBtn.addEventListener("click", () => {
@@ -239,6 +284,8 @@
     });
 
     container.querySelector("#ap-settings-btn").addEventListener("click", () => AP.settings.showSettings());
+    const histBtn = container.querySelector("#ap-history-btn");
+    if (histBtn) histBtn.addEventListener("click", () => AP.settings.showHistory());
     container.querySelector("#ap-hide-btn").addEventListener("click", hidePanel);
     container.querySelector("#ap-home-btn").addEventListener("click", () => {
       if (AP._resetPanelPosition) AP._resetPanelPosition();
@@ -272,10 +319,79 @@
     container.querySelector("#ap-cid-clear").addEventListener("click", () => AP.operatordesk.clearClientCid());
   }
 
+  function clampHeight(h) {
+    const c = document.getElementById(CONTAINER_ID);
+    const top = c ? c.getBoundingClientRect().top : 78;
+    const max = Math.max(260, window.innerHeight - top - 16);
+    return Math.min(Math.max(h, 260), max);
+  }
+
+  function applyPanelHeight(h) {
+    const c = document.getElementById(CONTAINER_ID);
+    if (!c) return;
+    if (h && h > 0) {
+      c.style.height = clampHeight(h) + "px";
+      c.style.maxHeight = "none";
+    } else {
+      c.style.height = "";
+      c.style.maxHeight = "";
+    }
+  }
+
+  function initResize(container) {
+    const handle = container.querySelector("#ap-resize-handle");
+    if (!handle) return;
+
+    const saved = AP.storage.getSettings().panelHeight;
+    if (saved) applyPanelHeight(saved);
+
+    let startY = 0, startH = 0, dragging = false;
+
+    const onMove = (e) => {
+      if (!dragging) return;
+      const y = e.touches ? e.touches[0].clientY : e.clientY;
+      const h = clampHeight(startH + (y - startY));
+      container.style.height = h + "px";
+      container.style.maxHeight = "none";
+      e.preventDefault();
+    };
+    const onUp = () => {
+      if (!dragging) return;
+      dragging = false;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onUp);
+      document.body.style.userSelect = "";
+      const h = Math.round(container.getBoundingClientRect().height);
+      AP.storage.patchSettings({ panelHeight: h });
+    };
+    const onDown = (e) => {
+      dragging = true;
+      startY = e.touches ? e.touches[0].clientY : e.clientY;
+      startH = container.getBoundingClientRect().height;
+      document.body.style.userSelect = "none";
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+      document.addEventListener("touchmove", onMove, { passive: false });
+      document.addEventListener("touchend", onUp);
+      e.preventDefault();
+    };
+    handle.addEventListener("mousedown", onDown);
+    handle.addEventListener("touchstart", onDown, { passive: false });
+
+    // Подвійний клік по ручці — скинути висоту до авто
+    handle.addEventListener("dblclick", () => {
+      applyPanelHeight(null);
+      AP.storage.patchSettings({ panelHeight: null });
+    });
+  }
+
   function loadForChat() {
     AP.checklist.load();
     AP.notes.load();
     AP.operatordesk.autoDetectCid();
+    if (AP.checklist.maybeOfferPull) AP.checklist.maybeOfferPull();
   }
 
   function todayKey() {
@@ -307,6 +423,7 @@
     AP.calculator.init();
 
     AP.draggable.initDraggable(container, container.querySelector("#ap-drag-handle"));
+    initResize(container);
 
     const settings = AP.storage.getSettings();
     setActiveTab(settings.activeTab || "checklist");
@@ -326,6 +443,10 @@
       }
       const currentChatId = AP.getActiveChatId();
       if (currentChatId !== previousChatId) {
+        // Автоархів: перед переходом зберігаємо попередній кейс в історію
+        if (previousChatId && AP.storage.getSettings().mode === "chat") {
+          AP.checklist.archiveChat(previousChatId);
+        }
         previousChatId = currentChatId;
         loadForChat();
       }

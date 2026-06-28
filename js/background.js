@@ -1,4 +1,4 @@
-// Alliance Pro — фоновий service worker.
+// Soft Pro — фоновий service worker.
 // Відповідає за таймер і будильник, які мають працювати ЗАВЖДИ,
 // навіть коли вкладка неактивна або браузер згорнутий, та бути
 // синхронізованими між усіма сторінками (єдиний глобальний таймер).
@@ -14,7 +14,7 @@ function notify(title, message) {
     chrome.notifications.create({
       type: "basic",
       iconUrl: "icons/icon128.png",
-      title: "Alliance Pro — " + title,
+      title: "Soft Pro — " + title,
       message: message,
       priority: 2,
       requireInteraction: true

@@ -11,7 +11,7 @@
       <div class="ap-header" id="ap-drag-handle">
         <div class="ap-brand">
           <span class="ap-brand-dot"></span>
-          <span>Alliance&nbsp;Pro</span>
+          <span>Soft&nbsp;Pro</span>
         </div>
         <div class="ap-header-actions">
           <button class="ap-icon-btn ap-theme-btn" title="Темна тема">🌙</button>
@@ -127,8 +127,8 @@
 
     const restore = document.createElement("button");
     restore.id = "ap-restore";
-    restore.title = "Alliance Pro";
-    restore.textContent = "AP";
+    restore.title = "Soft Pro";
+    restore.textContent = "SP";
     restore.style.display = "none";
     restore.addEventListener("click", () => { container.style.display = "flex"; restore.style.display = "none"; });
     document.body.appendChild(restore);

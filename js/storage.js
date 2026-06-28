@@ -27,13 +27,16 @@
       timerSound: "classic",
       usefulLinks: [],
       resetAfterCopy: false,
-      autoClearDaily: false,
+      autoClearDaily: true,
       lastAutoClear: null,
       windowPosition: null,
       hidden: false,
       collapsed: false,
       compact: false,
-      activeTab: "checklist"
+      activeTab: "checklist",
+      mode: "chat",
+      panelHeight: null,
+      tokensEnabled: true
     };
     let saved = {};
     try {
@@ -58,7 +61,27 @@
   }
 
   function blankChatData() {
-    return { cid: null, checks: {}, opts: {}, comment: "", notes: "", mood: null };
+    return { cid: null, event: "341", steps: {}, comment: "", notes: "", mood: null, result: "interrupted", checks: {}, opts: {} };
+  }
+
+  // Історія останніх кейсів (стирається разом із чатами раз на добу/вручну)
+  const HISTORY_KEY = "alliancepro_history";
+  const HISTORY_LIMIT = 10;
+
+  function getHistory() {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch (e) { return []; }
+  }
+  function addHistory(item, dedupeKey) {
+    let list = getHistory();
+    // Один запис на клієнта: прибираємо попередній запис із тим самим ключем
+    if (dedupeKey) list = list.filter((x) => x.label !== dedupeKey);
+    list.unshift(item);
+    list = list.slice(0, HISTORY_LIMIT);
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(list)); } catch (e) {}
+    return list;
+  }
+  function clearHistory() {
+    try { localStorage.removeItem(HISTORY_KEY); } catch (e) {}
   }
 
   function getChatData(chatId) {
@@ -88,6 +111,7 @@
     Object.keys(localStorage).forEach((key) => {
       if (key.indexOf(CHATDATA_PREFIX) === 0) localStorage.removeItem(key);
     });
+    clearHistory();
   }
 
   function optionLabel(o) {
@@ -213,9 +237,9 @@
 
   function exportAll() {
     return {
-      app: "Alliance Pro",
+      app: "Soft Pro",
       type: "settings-bundle",
-      version: "3.2.3",
+      version: "4.7",
       timestamp: new Date().toISOString(),
       settings: getSettings(),
       checkboxConfig: getCheckboxConfig(),
@@ -326,6 +350,9 @@
     setChatData,
     clearChatData,
     clearAllChatData,
+    getHistory,
+    addHistory,
+    clearHistory,
     getCheckboxConfig,
     setCheckboxConfig,
     getDefaultCheckboxConfig,

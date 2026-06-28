@@ -393,11 +393,11 @@
       AP.storage.getSettings().autoClearDaily,
       (on) => AP.storage.patchSettings({ autoClearDaily: on })
     ));
-    body.appendChild(rowButton(
-      "Налаштування чекбоксів",
-      "Пункти, варіанти, порядок, імпорт/експорт",
-      "Відкрити",
-      () => { removeModal(); showCheckboxConfig(); }
+    body.appendChild(rowToggle(
+      "Генерація токенів",
+      "Додавати прихований код синхронізації у скопійований текст",
+      AP.storage.getSettings().tokensEnabled,
+      (on) => AP.storage.patchSettings({ tokensEnabled: on })
     ));
     body.appendChild(rowButton(
       "Корисні посилання",
@@ -436,7 +436,7 @@
 
     const footer = document.createElement("div");
     footer.className = "ap-modal-footer";
-    footer.textContent = "Alliance Pro v3.2.3 by @Nilfa";
+    footer.textContent = "Soft Pro v4.7 by @Nilfa";
     wrap.appendChild(footer);
 
     const m = makeModal(wrap);
@@ -998,7 +998,7 @@
 
   function exportConfig() {
     downloadJson(
-      { app: "Alliance Pro", type: "checkboxes", version: "3.2.3", timestamp: new Date().toISOString(), checkboxConfig: workingConfig },
+      { app: "Soft Pro", type: "checkboxes", version: "4.7", timestamp: new Date().toISOString(), checkboxConfig: workingConfig },
       `alliance-pro-checkboxes-${stamp()}.json`
     );
   }
@@ -1035,5 +1035,133 @@
     });
   }
 
-  AP.settings = { showSettings, showCheckboxConfig };
+  function fmtTime(iso) {
+    try {
+      return new Date(iso).toLocaleString("uk-UA", {
+        day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
+      });
+    } catch (e) { return iso; }
+  }
+
+  function showHistoryItem(item) {
+    const wrap = document.createElement("div");
+    const title = "ID: " + (item.label || "—");
+    const { h, x } = header(title);
+    wrap.appendChild(h);
+
+    const body = document.createElement("div");
+    body.className = "ap-modal-body";
+    const pre = document.createElement("pre");
+    pre.className = "ap-hist-pre";
+    pre.textContent = item.text || "(порожньо)";
+    body.appendChild(pre);
+    wrap.appendChild(body);
+
+    const footer = document.createElement("div");
+    footer.className = "ap-modal-footer ap-hist-footer";
+    const copyBtn = document.createElement("button");
+    copyBtn.className = "ap-btn ap-btn-primary";
+    copyBtn.textContent = "Скопіювати";
+    copyBtn.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(item.text || ""); copyBtn.textContent = "✓ Скопійовано"; setTimeout(() => (copyBtn.textContent = "Скопіювати"), 900); } catch (e) {}
+    });
+    footer.appendChild(copyBtn);
+    wrap.appendChild(footer);
+
+    // stack:true — відкривається поверх вікна історії, не закриваючи його
+    const m = makeModal(wrap, null, { stack: true });
+    x.addEventListener("click", m.close);
+    AP.theme.apply(AP.theme.current());
+  }
+
+  function showHistory() {
+    const wrap = document.createElement("div");
+    const { h, x } = header("Історія (останні 10)");
+    wrap.appendChild(h);
+
+    const body = document.createElement("div");
+    body.className = "ap-modal-body";
+
+    const list = (AP.storage.getHistory && AP.storage.getHistory()) || [];
+    if (!list.length) {
+      const empty = document.createElement("div");
+      empty.className = "ap-hist-empty";
+      empty.textContent = "Поки що порожньо. Кейс потрапляє сюди після «Скинути».";
+      body.appendChild(empty);
+    } else {
+      list.forEach((item) => {
+        const row = document.createElement("div");
+        row.className = "ap-hist-item";
+
+        const top = document.createElement("div");
+        top.className = "ap-hist-top";
+        const idEl = document.createElement("span");
+        idEl.className = "ap-hist-id";
+        idEl.textContent = "ID: " + (item.label || "—");
+        const ev = document.createElement("span");
+        ev.className = "ap-hist-badge";
+        ev.textContent = (AP.checklist && AP.checklist.eventTitle ? AP.checklist.eventTitle(item.event) : item.eventTitle) || item.event || "—";
+        top.appendChild(idEl);
+        top.appendChild(ev);
+
+        const meta = document.createElement("div");
+        meta.className = "ap-hist-meta";
+        const resName = AP.checklist && AP.checklist.resultName ? AP.checklist.resultName(item.result) : item.result;
+        const resEmoji = AP.checklist && AP.checklist.resultEmoji ? AP.checklist.resultEmoji(item.result) : "";
+        meta.textContent = `${resEmoji} Результат: ${resName}  •  ${fmtTime(item.time)}`;
+
+        const actions = document.createElement("div");
+        actions.className = "ap-hist-actions";
+        const restoreBtn = document.createElement("button");
+        restoreBtn.className = "ap-btn ap-btn-primary";
+        restoreBtn.textContent = "↻ Відновити";
+        restoreBtn.addEventListener("click", () => {
+          if (AP.checklist && AP.checklist.restoreSnapshot) AP.checklist.restoreSnapshot(item);
+          removeModal();
+        });
+        const showBtn = document.createElement("button");
+        showBtn.className = "ap-btn ap-btn-ghost";
+        showBtn.textContent = "Показати";
+        showBtn.addEventListener("click", () => showHistoryItem(item));
+        const copyBtn = document.createElement("button");
+        copyBtn.className = "ap-btn ap-btn-ghost";
+        copyBtn.textContent = "Скопіювати";
+        copyBtn.addEventListener("click", async () => {
+          try { await navigator.clipboard.writeText(item.text || ""); copyBtn.textContent = "✓"; setTimeout(() => (copyBtn.textContent = "Скопіювати"), 900); } catch (e) {}
+        });
+        actions.appendChild(restoreBtn);
+        actions.appendChild(showBtn);
+        actions.appendChild(copyBtn);
+
+        row.appendChild(top);
+        row.appendChild(meta);
+        row.appendChild(actions);
+        body.appendChild(row);
+      });
+    }
+
+    wrap.appendChild(body);
+
+    const footer = document.createElement("div");
+    footer.className = "ap-modal-footer ap-hist-footer";
+    const clearBtn = document.createElement("button");
+    clearBtn.className = "ap-btn ap-btn-danger";
+    clearBtn.textContent = "Очистити історію";
+    clearBtn.disabled = !list.length;
+    clearBtn.addEventListener("click", () => {
+      uiConfirm({
+        title: "Очистити історію?",
+        text: "Усі записи історії буде видалено.",
+        onConfirm: () => { if (AP.storage.clearHistory) AP.storage.clearHistory(); removeModal(); showHistory(); }
+      });
+    });
+    footer.appendChild(clearBtn);
+    wrap.appendChild(footer);
+
+    const m = makeModal(wrap);
+    x.addEventListener("click", m.close);
+    AP.theme.apply(AP.theme.current());
+  }
+
+  AP.settings = { showSettings, showCheckboxConfig, showHistory };
 })();
