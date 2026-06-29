@@ -156,10 +156,20 @@
     });
   }
 
-  // Натискає рідну кнопку HARVESTER на сторінці чату (серверна дія Sender)
+  // Натискає рідну кнопку HARVESTER на сторінці чату (серверна дія Sender).
+  // ВАЖЛИВО: шукаємо саме кнопку платформи (.sender_form_has_action), а не нашу
+  // кнопку в панелі (вона теж має текст «HARVESTER»), і виключаємо вміст панелі.
   function triggerHarvester() {
-    const btns = Array.from(document.querySelectorAll("button.sender_form_has_action, button"));
-    const b = btns.find((el) => el.textContent && el.textContent.trim().toUpperCase() === "HARVESTER");
+    const panel = document.getElementById("alliance-pro-container");
+    const isOurs = (el) => panel && panel.contains(el);
+    // 1) рідна кнопка платформи з текстом HARVESTER
+    let b = Array.from(document.querySelectorAll("button.sender_form_has_action"))
+      .find((el) => /HARVESTER/i.test(el.textContent || ""));
+    // 2) запасний варіант: будь-яка кнопка «HARVESTER» поза нашою панеллю
+    if (!b) {
+      b = Array.from(document.querySelectorAll("button"))
+        .find((el) => (el.textContent || "").trim().toUpperCase() === "HARVESTER" && !isOurs(el));
+    }
     if (b) { b.click(); return true; }
     return false;
   }
