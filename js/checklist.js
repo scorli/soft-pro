@@ -105,11 +105,11 @@
       { type: "checkbox", text: "Дата - 2 дні" },
       { type: "checkbox", text: "Дата - 10 днів" },
       { type: "checkbox", text: "Сума - 100%" },
+      { type: "checkbox", text: "Сума - Аванс" },
       { type: "checkbox", text: "Сума - яку суму готові внести?" },
       { type: "checkbox", text: "Сума - 50%" },
       { type: "checkbox", text: "Сума - 25%" },
       { type: "checkbox", text: "Сума - мін." },
-      { type: "checkbox", text: "Сума - Аванс" },
       { type: "header", text: "‼️ Додатково:" },
       { type: "checkbox", text: "Подяка військовому" },
       { type: "checkbox", text: "Спеціальний рахунок" },
@@ -142,8 +142,7 @@
       { type: "checkbox", text: "Сума - Яку суму готові внести?" },
       { type: "checkbox", text: "Сума - 50%" },
       { type: "checkbox", text: "Сума - 25%" },
-      { type: "checkbox", text: "Сума - мін." },
-      { type: "checkbox", text: "Сума - Аванс" }
+      { type: "checkbox", text: "Сума - мін." }
     ],
     [EVENT_DVZ_327]: [
       { type: "header", text: "ℹ️ Інформування:" },
@@ -163,8 +162,7 @@
       { type: "checkbox", text: "Сума - Прострочений" },
       { type: "checkbox", text: "Сума - 50%" },
       { type: "checkbox", text: "Сума - 25%" },
-      { type: "checkbox", text: "Сума - мін." },
-      { type: "checkbox", text: "Сума - Аванс" }
+      { type: "checkbox", text: "Сума - мін." }
     ],
     [EVENT_290353]: [
       { type: "header", text: "ℹ️ Інформування:" },
@@ -509,6 +507,8 @@
     let groupButtons = null;
     let tradeDateBtns = null, tradeSumBtns = null;
     let cycNegWrap = null;
+    // Послідовність варіантів Торгу (Дата / Сума) — для покрокового вибору
+    const dateSeq = [], sumSeq = [];
 
     const ensureTrade = () => {
       if (tradeDateBtns) return;
@@ -565,10 +565,32 @@
         const checked = saved[idx] === true;
         if (groupMode === "trade") {
           ensureTrade();
+          const isDate = item.text.startsWith("Дата - ");
+          const seq = isDate ? dateSeq : sumSeq;
+          const pos = seq.length;
           const btn = el("button", "ap-grp-btn" + (checked ? " active" : ""), tradeShortLabel(item.text));
           btn.type = "button";
-          btn.addEventListener("click", () => toggleStep(idx, btn, true));
-          (item.text.startsWith("Дата - ") ? tradeDateBtns : tradeSumBtns).appendChild(btn);
+          // Послідовний вибір: варіант доступний лише якщо обрано попередній
+          if (pos > 0 && !checked) {
+            const prev = seq[pos - 1];
+            if (saved[prev.idx] !== true) btn.disabled = true;
+          }
+          btn.addEventListener("click", () => {
+            if (btn.disabled) return;
+            const d = getData(); const s = getSaved(d, sanitizeEventCode(d.event));
+            const arr = isDate ? dateSeq : sumSeq;
+            const p = arr.findIndex((x) => x.idx === idx);
+            if (s[idx] === true) {
+              // зняти цей і всі наступні в підгрупі
+              for (let k = p; k < arr.length; k++) s[arr[k].idx] = false;
+            } else {
+              s[idx] = true;
+            }
+            setData(d);
+            render();
+          });
+          seq.push({ idx: idx });
+          (isDate ? tradeDateBtns : tradeSumBtns).appendChild(btn);
           checkboxIndex++; return;
         }
         if (groupMode === "cycle" || groupMode === "negative") {
@@ -707,17 +729,8 @@
     if (event === EVENT_DVZ_356319 && headerKeys.trade && saved._dvzTermsAdvance === "decline") {
       leftBy[headerKeys.trade] = (leftBy[headerKeys.trade] || []).filter((x) => x !== "Сума - 100%");
     }
-    // Торг — вибір по одному: якщо вже обрано дату, інші дати не показуємо в «Залишилось»;
-    // те саме окремо для суми.
-    if (headerKeys.trade) {
-      const doneTrade = doneBy[headerKeys.trade] || [];
-      const dateDone = doneTrade.some((x) => x.startsWith("Дата - "));
-      const sumDone = doneTrade.some((x) => x.startsWith("Сума - "));
-      let leftTrade = leftBy[headerKeys.trade] || [];
-      if (dateDone) leftTrade = leftTrade.filter((x) => !x.startsWith("Дата - "));
-      if (sumDone) leftTrade = leftTrade.filter((x) => !x.startsWith("Сума - "));
-      leftBy[headerKeys.trade] = leftTrade;
-    }
+    // Торг послідовний: обрані варіанти йдуть префіксом, а в «Залишилось»
+    // лишаються ще не обрані наступні (їх повертає звичайний leftBy без фільтрів).
     if (headerKeys.cycle) delete leftBy[headerKeys.cycle];
     if (headerKeys.negative) delete leftBy[headerKeys.negative];
 
@@ -863,20 +876,27 @@
   }
   // ===== Автовизначення події за K-кодом на сторінці =====
   function detectEventFromPage() {
-    let code = null;
-    // спершу у вузьких спанах інфо-картки, де лежить «(K00134)»
-    const spans = document.querySelectorAll("span.fixed-width");
-    for (let i = 0; i < spans.length && !code; i++) {
-      const m = spans[i].textContent.match(/\(?K0*(\d{2,6})\)?/);
-      if (m) code = m[1];
+    // ВАЖЛИВО: картки попередніх чатів лишаються в DOM (просто приховані), тож
+    // беремо лише ВИДИМІ спани — тобто картку саме активного чату. Інакше детект
+    // чіплявся б за перший відкритий чат (працювало лише на першому).
+    const spans = Array.from(document.querySelectorAll("span.fixed-width"))
+      .filter((s) => s.offsetParent !== null);
+    const texts = spans.map((s) => s.textContent || "");
+    // Запасний варіант — видима область повідомлень активного чату.
+    const box = Array.from(document.querySelectorAll(".sf_chat_msg_holder"))
+      .find((b) => b.offsetParent !== null);
+    if (box) texts.push(box.innerText || box.textContent || "");
+    // Шукаємо ВСІ K-коди (латинська K або кирилична К) і повертаємо перший,
+    // що є в нашому списку. Невідомі коди пропускаємо, а не зупиняємось на них.
+    for (let t = 0; t < texts.length; t++) {
+      const re = /[KК]0*(\d{2,6})/g;
+      let m;
+      while ((m = re.exec(texts[t])) !== null) {
+        const ev = KCODE_MAP[m[1]];
+        if (ev) return ev;
+      }
     }
-    if (!code) {
-      const box = document.querySelector(".sf_chat_msg_holder");
-      const m = box && (box.innerText || box.textContent || "").match(/\(K0*(\d{2,6})\)/);
-      if (m) code = m[1];
-    }
-    if (!code) return null;
-    return KCODE_MAP[code] || null; // невідома подія → null (ігноруємо, без помилки)
+    return null;
   }
 
   let eventObserver = null;

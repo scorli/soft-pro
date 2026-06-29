@@ -436,7 +436,7 @@
 
     const footer = document.createElement("div");
     footer.className = "ap-modal-footer";
-    footer.textContent = "Soft Pro v4.8.4 by @Nilfa";
+    footer.textContent = "Soft Pro v4.8.6 by @Nilfa";
     wrap.appendChild(footer);
 
     const m = makeModal(wrap);
@@ -998,7 +998,7 @@
 
   function exportConfig() {
     downloadJson(
-      { app: "Soft Pro", type: "checkboxes", version: "4.8.4", timestamp: new Date().toISOString(), checkboxConfig: workingConfig },
+      { app: "Soft Pro", type: "checkboxes", version: "4.8.6", timestamp: new Date().toISOString(), checkboxConfig: workingConfig },
       `alliance-pro-checkboxes-${stamp()}.json`
     );
   }

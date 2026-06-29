@@ -910,6 +910,8 @@
 }
 .ap-grp-btn:hover { border-color: var(--ap-accent); }
 .ap-grp-btn.active { background: var(--ap-accent); color: var(--ap-accent-text); border-color: var(--ap-accent); }
+.ap-grp-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.ap-grp-btn:disabled:hover { border-color: var(--ap-border); }
 
 /* Місяці ДВЗ */
 .ap-months { flex-direction: column; align-items: stretch; gap: 6px; }
