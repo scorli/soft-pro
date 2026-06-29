@@ -239,7 +239,7 @@
     return {
       app: "Soft Pro",
       type: "settings-bundle",
-      version: "4.7",
+      version: "4.7.1",
       timestamp: new Date().toISOString(),
       settings: getSettings(),
       checkboxConfig: getCheckboxConfig(),

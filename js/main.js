@@ -297,11 +297,22 @@
     if (settings.collapsed) {
       body.classList.add("ap-collapsed");
       collapseBtn.classList.add("ap-rotated");
+      // у згорнутому стані — авто-висота (тільки шапка), без фіксованої висоти панелі
+      container.style.height = "";
+      container.style.maxHeight = "";
     }
     collapseBtn.addEventListener("click", () => {
       const collapsed = body.classList.toggle("ap-collapsed");
       collapseBtn.classList.toggle("ap-rotated", collapsed);
       AP.storage.patchSettings({ collapsed });
+      if (collapsed) {
+        // згортаємо — прибираємо фіксовану висоту, щоб не лишався порожній фон
+        container.style.height = "";
+        container.style.maxHeight = "";
+      } else {
+        // розгортаємо — повертаємо збережену висоту
+        applyPanelHeight(AP.storage.getSettings().panelHeight);
+      }
     });
 
     container.querySelectorAll(".ap-tab").forEach((t) => {
@@ -329,6 +340,13 @@
   function applyPanelHeight(h) {
     const c = document.getElementById(CONTAINER_ID);
     if (!c) return;
+    // у згорнутому стані висота авто (тільки шапка)
+    const b = c.querySelector("#ap-body");
+    if (b && b.classList.contains("ap-collapsed")) {
+      c.style.height = "";
+      c.style.maxHeight = "";
+      return;
+    }
     if (h && h > 0) {
       c.style.height = clampHeight(h) + "px";
       c.style.maxHeight = "none";
